@@ -1,0 +1,70 @@
+name: Create Student Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      student_github_username:
+        description: "GitHub username of the student"
+        required: true
+      project_name:
+        description: "Project name (e.g., chal-test, cs101)"
+        required: true
+
+jobs:
+  create-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create student repo from template
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+          script: |
+            const student = '${{ github.event.inputs.student_github_username }}';
+            const projectName = '${{ github.event.inputs.project_name }}';
+            const template = process.env.GITHUB_REPOSITORY; // owner/repo (current repo)
+            const repoName = `${projectName}-${student}`;
+            const [owner, templateRepo] = template.split('/');
+
+            // Create the repo from template
+            const repo = await github.rest.repos.createUsingTemplate({
+              template_owner: owner,
+              template_repo: templateRepo,
+              owner: student,
+              name: repoName,
+              private: true,
+              include_all_branches: false,
+              description: `${projectName} challenge repo for ${student}`
+            });
+
+            // Add instructor as admin collaborator
+            await github.rest.repos.addCollaborator({
+              owner: student,
+              repo: repoName,
+              username: context.repo.owner,
+              permission: 'admin'
+            });
+
+            core.setOutput('repo_url', repo.data.html_url);
+            core.setOutput('student_repo', `${student}/${repoName}`);
+            core.setOutput('project_name', projectName);
+
+      - name: Set PROJECT_NAME variable in student repo
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ steps.create-repo.outputs.student_repo }}/actions/variables \
+            -d '{"name": "PROJECT_NAME", "value": "${{ steps.create-repo.outputs.project_name }}"}'
+
+      - name: Trigger deliver-starter workflow in main repo
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.everest-preview+json" \
+            https://api.github.com/repos/${{ github.repository_owner }}/${{ steps.create-repo.outputs.project_name }}-main/dispatches \
+            -d '{"event_type": "student-repo-created", "client_payload": {"student_repo": "${{ steps.create-repo.outputs.student_repo }}", "requesting_part": 1}}'
+
+      - name: Output repo URL
+        run: |
+          echo "Student repository created: ${{ steps.create-repo.outputs.repo_url }}"
+          echo "Repository will be initialized with Part 1 starter code automatically."
