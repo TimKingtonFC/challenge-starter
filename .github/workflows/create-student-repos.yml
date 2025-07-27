@@ -1,20 +1,40 @@
-name: Create Student Repository
+name: Create Student Repo from Issue
 
 on:
-  repository_dispatch:
-    types: [create-student-repo]
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
 
 jobs:
-  create-repo:
+  create-student-repo:
+    if: |
+      github.event.issue.body && startsWith(github.event.issue.body, '/create-student-repo') ||
+      github.event.comment && startsWith(github.event.comment.body, '/create-student-repo')
     runs-on: ubuntu-latest
     steps:
+      - name: Parse command
+        id: parse
+        run: |
+          if [[ "${{ github.event.issue.body }}" == /create-student-repo* ]]; then
+            CMD="${{ github.event.issue.body }}"
+          else
+            CMD="${{ github.event.comment.body }}"
+          fi
+          # Extract username and project name
+          STUDENT_GITHUB_USERNAME=$(echo $CMD | awk '{print $2}')
+          PROJECT_NAME=$(echo $CMD | awk '{print $3}')
+          echo "student_github_username=$STUDENT_GITHUB_USERNAME" >> $GITHUB_OUTPUT
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+
       - name: Create student repo from template
+        id: create_repo
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
           script: |
-            const student = '${{ github.event.client_payload.student_github_username }}';
-            const projectName = '${{ github.event.client_payload.project_name }}';
+            const student = '${{ steps.parse.outputs.student_github_username }}';
+            const projectName = '${{ steps.parse.outputs.project_name }}';
             const template = process.env.GITHUB_REPOSITORY; // owner/repo (current repo)
             const repoName = `${projectName}-${student}`;
             const [owner, templateRepo] = template.split('/');
@@ -34,7 +54,7 @@ jobs:
             await github.rest.repos.addCollaborator({
               owner: student,
               repo: repoName,
-              username: context.repo.owner,
+              username: 'TimKingtonFC',
               permission: 'admin'
             });
 
@@ -47,18 +67,26 @@ jobs:
           curl -X POST \
             -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ steps.create-repo.outputs.student_repo }}/actions/variables \
-            -d '{"name": "PROJECT_NAME", "value": "${{ steps.create-repo.outputs.project_name }}"}'
+            https://api.github.com/repos/${{ steps.create_repo.outputs.student_repo }}/actions/variables \
+            -d '{"name": "PROJECT_NAME", "value": "${{ steps.create_repo.outputs.project_name }}"}'
 
       - name: Trigger deliver-starter workflow in main repo
         run: |
           curl -X POST \
             -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.everest-preview+json" \
-            https://api.github.com/repos/${{ github.repository_owner }}/${{ steps.create-repo.outputs.project_name }}/dispatches \
-            -d '{"event_type": "deliver-starter", "client_payload": {"student_repo": "${{ steps.create-repo.outputs.student_repo }}", "requesting_part": 1}}'
+            https://api.github.com/repos/${{ github.repository_owner }}/${{ steps.create_repo.outputs.project_name }}/dispatches \
+            -d '{"event_type": "deliver-starter", "client_payload": {"student_repo": "${{ steps.create_repo.outputs.student_repo }}", "requesting_part": 1}}'
 
-      - name: Output repo URL
-        run: |
-          echo "Student repository created: ${{ steps.create-repo.outputs.repo_url }}"
-          echo "Repository will be initialized with Part 1 starter code automatically."
+      - name: Comment with result
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue_number = context.issue.number;
+            const repo_url = '${{ steps.create_repo.outputs.repo_url }}';
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number,
+              body: `Student repository created: ${repo_url}`
+            });
