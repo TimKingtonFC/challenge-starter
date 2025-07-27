@@ -8,9 +8,6 @@ on:
 
 jobs:
   create-student-repo:
-    if: |
-      github.event.issue.body && startsWith(github.event.issue.body, '/create-student-repo') ||
-      github.event.comment && startsWith(github.event.comment.body, '/create-student-repo')
     runs-on: ubuntu-latest
     steps:
       - name: Parse command
@@ -18,17 +15,25 @@ jobs:
         run: |
           if [[ "${{ github.event.issue.body }}" == /create-student-repo* ]]; then
             CMD="${{ github.event.issue.body }}"
-          else
+          elif [[ "${{ github.event.comment.body }}" == /create-student-repo* ]]; then
             CMD="${{ github.event.comment.body }}"
+          else
+            echo "No /create-student-repo command found. Exiting. ${{ github.event.comment.body }} ${{ github.event.issue.body }}"
+            exit 0
           fi
           # Extract username and project name
           STUDENT_GITHUB_USERNAME=$(echo $CMD | awk '{print $2}')
           PROJECT_NAME=$(echo $CMD | awk '{print $3}')
+          if [[ -z "$STUDENT_GITHUB_USERNAME" || -z "$PROJECT_NAME" ]]; then
+            echo "Malformed command. Usage: /create-student-repo <github-username> <project-name>"
+            exit 0
+          fi
           echo "student_github_username=$STUDENT_GITHUB_USERNAME" >> $GITHUB_OUTPUT
           echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
 
       - name: Create student repo from template
         id: create_repo
+        if: steps.parse.outputs.student_github_username && steps.parse.outputs.project_name
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
@@ -63,6 +68,7 @@ jobs:
             core.setOutput('project_name', projectName);
 
       - name: Set PROJECT_NAME variable in student repo
+        if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
         run: |
           curl -X POST \
             -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
@@ -71,6 +77,7 @@ jobs:
             -d '{"name": "PROJECT_NAME", "value": "${{ steps.create_repo.outputs.project_name }}"}'
 
       - name: Trigger deliver-starter workflow in main repo
+        if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
         run: |
           curl -X POST \
             -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
@@ -79,6 +86,7 @@ jobs:
             -d '{"event_type": "deliver-starter", "client_payload": {"student_repo": "${{ steps.create_repo.outputs.student_repo }}", "requesting_part": 1}}'
 
       - name: Comment with result
+        if: steps.create_repo.outputs.repo_url
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
