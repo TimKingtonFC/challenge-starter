@@ -1,14 +1,8 @@
 name: Create Student Repository
 
 on:
-  workflow_dispatch:
-    inputs:
-      student_github_username:
-        description: "GitHub username of the student"
-        required: true
-      project_name:
-        description: "Project name (e.g., chal-test, cs101)"
-        required: true
+  repository_dispatch:
+    types: [create-student-repo]
 
 jobs:
   create-repo:
@@ -19,8 +13,8 @@ jobs:
         with:
           github-token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
           script: |
-            const student = '${{ github.event.inputs.student_github_username }}';
-            const projectName = '${{ github.event.inputs.project_name }}';
+            const student = '${{ github.event.client_payload.student_github_username }}';
+            const projectName = '${{ github.event.client_payload.project_name }}';
             const template = process.env.GITHUB_REPOSITORY; // owner/repo (current repo)
             const repoName = `${projectName}-${student}`;
             const [owner, templateRepo] = template.split('/');
