@@ -65,10 +65,6 @@ jobs:
       - name: Clone main repo and push starter branch
         if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
         run: |
-          # Debug: Check what we're trying to clone
-          echo "Attempting to clone: TimKingtonFC/${{ steps.create_repo.outputs.project_name }}"
-          echo "Student repo: ${{ steps.create_repo.outputs.student_repo }}"
-
           # Clone the main repo as a bare repository
           git clone --bare https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/TimKingtonFC/${{ steps.create_repo.outputs.project_name }}.git mirror
           cd mirror
@@ -76,9 +72,21 @@ jobs:
           # Push the part001-starter branch to the student repo as part001-starter
           git push https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.create_repo.outputs.student_repo }}.git part001-starter:part001-starter
 
+          # Create part001-work branch from part001-starter
+          git push https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.create_repo.outputs.student_repo }}.git part001-starter:part001-work
+
           # Clean up
           cd ..
           rm -rf mirror
+
+      - name: Set default branch to part001-work
+        if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
+        run: |
+          curl -X PATCH \
+            -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ steps.create_repo.outputs.student_repo }} \
+            -d '{"default_branch": "part001-work"}'
 
       - name: Set PROJECT_NAME variable in student repo
         if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
@@ -88,15 +96,6 @@ jobs:
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ steps.create_repo.outputs.student_repo }}/actions/variables \
             -d '{"name": "PROJECT_NAME", "value": "${{ steps.create_repo.outputs.project_name }}"}'
-
-      - name: Trigger deliver-starter workflow in main repo
-        if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
-        run: |
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.everest-preview+json" \
-            https://api.github.com/repos/${{ github.repository_owner }}/${{ steps.create_repo.outputs.project_name }}/dispatches \
-            -d '{"event_type": "deliver-starter", "client_payload": {"student_repo": "${{ steps.create_repo.outputs.student_repo }}", "requesting_part": 1}}'
 
       - name: Comment with result
         if: steps.create_repo.outputs.repo_url
