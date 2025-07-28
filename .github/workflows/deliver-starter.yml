@@ -126,8 +126,21 @@ jobs:
           github-token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
           script: |
             const issue_number = context.issue.number;
+
+            // Determine which step failed
+            let failedStep = 'Unknown step';
+            if ('${{ steps.parse.outcome }}' === 'failure') {
+              failedStep = 'Command parsing';
+            } else if ('${{ steps.get_student_repo.outcome }}' === 'failure') {
+              failedStep = 'Finding student repository';
+            } else if ('${{ steps.push_branches.outcome }}' === 'failure') {
+              failedStep = 'Pushing branches';
+            } else if ('${{ steps.set_default.outcome }}' === 'failure') {
+              failedStep = 'Setting default branch';
+            }
+
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number,
-              body: `❌ **Workflow failed!**\n\nSomething went wrong while delivering the next part. Please check the workflow logs for details and try again.`
+              body: `❌ **Workflow failed!**\n\nFailed at: ${failedStep}\n\nPlease check the workflow logs for details and try again.`
             });
