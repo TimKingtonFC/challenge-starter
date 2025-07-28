@@ -110,7 +110,7 @@ jobs:
           script: |
             const issue_number = context.issue.number;
             const student_repo = '${{ steps.get_student_repo.outputs.student_repo }}';
-            const part_to_start = '${{ steps.parse.outputs.part_to_start_int }}';
+            const part_to_start = '${{ steps.parse.outputs.part_to_start }}';
 
             await github.rest.issues.createComment({
               ...context.repo,
