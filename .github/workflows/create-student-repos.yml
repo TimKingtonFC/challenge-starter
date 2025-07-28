@@ -7,7 +7,7 @@ on:
 jobs:
   create-student-repo:
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.title, '/create-student-repo') || contains(github.event.issue.body, '/create-student-repo')
+    if: contains(github.event.issue.title, '/start-challenge') || contains(github.event.issue.body, '/start-challenge')
     steps:
       - name: Parse command
         id: parse
@@ -16,12 +16,12 @@ jobs:
           TITLE="${{ github.event.issue.title }}"
           BODY="${{ github.event.issue.body }}"
 
-          if [[ "$TITLE" == /create-student-repo* ]]; then
+          if [[ "$TITLE" == /start-challenge* ]]; then
             CMD="$TITLE"
-          elif [[ "$BODY" == /create-student-repo* ]]; then
+          elif [[ "$BODY" == /start-challenge* ]]; then
             CMD="$BODY"
           else
-            echo "No /create-student-repo command found in title or body. Exiting."
+            echo "No /start-challenge command found in title or body. Exiting."
             exit 0
           fi
 
@@ -29,7 +29,7 @@ jobs:
           STUDENT_GITHUB_USERNAME=$(echo $CMD | awk '{print $2}')
           PROJECT_NAME=$(echo $CMD | awk '{print $3}')
           if [[ -z "$STUDENT_GITHUB_USERNAME" || -z "$PROJECT_NAME" ]]; then
-            echo "Malformed command. Usage: /create-student-repo <github-username> <project-name>"
+            echo "Malformed command. Usage: /start-challenge <github-username> <project-name>"
             exit 0
           fi
           echo "student_github_username=$STUDENT_GITHUB_USERNAME" >> $GITHUB_OUTPUT

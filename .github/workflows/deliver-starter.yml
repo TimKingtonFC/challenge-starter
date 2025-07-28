@@ -47,13 +47,13 @@ jobs:
           ISSUE_TITLE="${{ github.event.issue.title }}"
           ISSUE_BODY="${{ github.event.issue.body }}"
 
-          # Check title first, then body for the create-student-repo command
-          if [[ "$ISSUE_TITLE" == /create-student-repo* ]]; then
+          # Check title first, then body for the start-challenge command
+          if [[ "$ISSUE_TITLE" == /start-challenge* ]]; then
             CMD="$ISSUE_TITLE"
-          elif [[ "$ISSUE_BODY" == /create-student-repo* ]]; then
+          elif [[ "$ISSUE_BODY" == /start-challenge* ]]; then
             CMD="$ISSUE_BODY"
           else
-            echo "Error: Could not find /create-student-repo command in issue title or body"
+            echo "Error: Could not find /start-challenge command in issue title or body"
             echo "Issue title: $ISSUE_TITLE"
             echo "Issue body: $ISSUE_BODY"
             exit 1
@@ -111,12 +111,11 @@ jobs:
             const issue_number = context.issue.number;
             const student_repo = '${{ steps.get_student_repo.outputs.student_repo }}';
             const part_to_start = '${{ steps.parse.outputs.part_to_start_int }}';
-            const previous_part = '${{ steps.parse.outputs.previous_part_int }}';
 
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number,
-              body: `✅ **Part ${part_to_start} delivered to ${student_repo}!**\n\n- Part ${previous_part} solution has been pushed\n- Part ${part_to_start} starter code is ready\n- Default branch is now part${part_to_start}-work\n\nYou can now work on Part ${part_to_start}!`
+              body: `✅ Part ${part_to_start} delivered to ${student_repo}!`
             });
 
       - name: Comment on failure
