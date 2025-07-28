@@ -7,6 +7,7 @@ on:
 jobs:
   deliver-next-part:
     runs-on: ubuntu-latest
+    if: contains(github.event.comment.body, '/start-part')
     steps:
       - name: Parse command
         id: parse
