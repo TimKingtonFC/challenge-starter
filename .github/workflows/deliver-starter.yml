@@ -11,10 +11,13 @@ jobs:
       - name: Parse command
         id: parse
         run: |
-          if [[ "${{ github.event.comment.body }}" == /start-part* ]]; then
-            CMD="${{ github.event.comment.body }}"
+          # The /start-part command must be in a comment
+          COMMENT="${{ github.event.comment.body }}"
+
+          if [[ "$COMMENT" == /start-part* ]]; then
+            CMD="$COMMENT"
           else
-            echo "No /start-part command found. Exiting."
+            echo "No /start-part command found in comment. Exiting."
             exit 0
           fi
           # Extract the part number to start
@@ -39,16 +42,29 @@ jobs:
       - name: Get student repo from issue
         id: get_student_repo
         run: |
-          # Get the original issue body to find the create-student-repo command
+          # Get the original issue title and body to find the create-student-repo command
+          ISSUE_TITLE="${{ github.event.issue.title }}"
           ISSUE_BODY="${{ github.event.issue.body }}"
 
-          # Extract username and project from the original create-student-repo command
-          USERNAME=$(echo "$ISSUE_BODY" | grep -o '/create-student-repo [^[:space:]]* [^[:space:]]*' | awk '{print $2}')
-          PROJECT=$(echo "$ISSUE_BODY" | grep -o '/create-student-repo [^[:space:]]* [^[:space:]]*' | awk '{print $3}')
+          # Check title first, then body for the create-student-repo command
+          if [[ "$ISSUE_TITLE" == /create-student-repo* ]]; then
+            CMD="$ISSUE_TITLE"
+          elif [[ "$ISSUE_BODY" == /create-student-repo* ]]; then
+            CMD="$ISSUE_BODY"
+          else
+            echo "Error: Could not find /create-student-repo command in issue title or body"
+            echo "Issue title: $ISSUE_TITLE"
+            echo "Issue body: $ISSUE_BODY"
+            exit 1
+          fi
+
+          # Extract username and project from the command
+          USERNAME=$(echo "$CMD" | awk '{print $2}')
+          PROJECT=$(echo "$CMD" | awk '{print $3}')
 
           if [[ -z "$USERNAME" || -z "$PROJECT" ]]; then
-            echo "Error: Could not find /create-student-repo command in issue body"
-            echo "Issue body: $ISSUE_BODY"
+            echo "Error: Could not parse username and project from command"
+            echo "Command: $CMD"
             exit 1
           fi
 
