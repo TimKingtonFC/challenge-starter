@@ -3,8 +3,6 @@ name: Create Student Repo from Issue
 on:
   issues:
     types: [opened]
-  issue_comment:
-    types: [created]
 
 jobs:
   create-student-repo:
@@ -15,10 +13,8 @@ jobs:
         run: |
           if [[ "${{ github.event.issue.body }}" == /create-student-repo* ]]; then
             CMD="${{ github.event.issue.body }}"
-          elif [[ "${{ github.event.comment.body }}" == /create-student-repo* ]]; then
-            CMD="${{ github.event.comment.body }}"
           else
-            echo "No /create-student-repo command found. Exiting. ${{ github.event.comment.body }} ${{ github.event.issue.body }}"
+            echo "No /create-student-repo command found. Exiting."
             exit 0
           fi
           # Extract username and project name

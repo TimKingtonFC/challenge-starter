@@ -1,8 +1,6 @@
 name: Deliver Next Part
 
 on:
-  issues:
-    types: [opened]
   issue_comment:
     types: [created]
 
@@ -13,9 +11,7 @@ jobs:
       - name: Parse command
         id: parse
         run: |
-          if [[ "${{ github.event.issue.body }}" == /start-part* ]]; then
-            CMD="${{ github.event.issue.body }}"
-          elif [[ "${{ github.event.comment.body }}" == /start-part* ]]; then
+          if [[ "${{ github.event.comment.body }}" == /start-part* ]]; then
             CMD="${{ github.event.comment.body }}"
           else
             echo "No /start-part command found. Exiting."
@@ -43,17 +39,21 @@ jobs:
       - name: Get student repo from issue
         id: get_student_repo
         run: |
-          # Extract student repo from issue title or body
-          # Assuming format: "student-repo: TimKingtonFC/chaltest-username"
+          # Get the original issue body to find the create-student-repo command
           ISSUE_BODY="${{ github.event.issue.body }}"
-          STUDENT_REPO=$(echo "$ISSUE_BODY" | grep -o 'student-repo: [^[:space:]]*' | cut -d' ' -f2)
 
-          if [[ -z "$STUDENT_REPO" ]]; then
-            echo "Error: Could not find student-repo in issue body"
+          # Extract username and project from the original create-student-repo command
+          USERNAME=$(echo "$ISSUE_BODY" | grep -o '/create-student-repo [^[:space:]]* [^[:space:]]*' | awk '{print $2}')
+          PROJECT=$(echo "$ISSUE_BODY" | grep -o '/create-student-repo [^[:space:]]* [^[:space:]]*' | awk '{print $3}')
+
+          if [[ -z "$USERNAME" || -z "$PROJECT" ]]; then
+            echo "Error: Could not find /create-student-repo command in issue body"
             echo "Issue body: $ISSUE_BODY"
             exit 1
           fi
 
+          # Construct the student repo name
+          STUDENT_REPO="TimKingtonFC/${PROJECT}-${USERNAME}"
           echo "student_repo=$STUDENT_REPO" >> $GITHUB_OUTPUT
 
       - name: Push solution and starter branches
