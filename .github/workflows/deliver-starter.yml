@@ -1,0 +1,103 @@
+name: Deliver Next Part
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  deliver-next-part:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse command
+        id: parse
+        run: |
+          if [[ "${{ github.event.issue.body }}" == /start-part* ]]; then
+            CMD="${{ github.event.issue.body }}"
+          elif [[ "${{ github.event.comment.body }}" == /start-part* ]]; then
+            CMD="${{ github.event.comment.body }}"
+          else
+            echo "No /start-part command found. Exiting."
+            exit 0
+          fi
+          # Extract the part number to start
+          PART_TO_START=$(echo $CMD | awk '{print $2}')
+          if [[ -z "$PART_TO_START" ]]; then
+            echo "Malformed command. Usage: /start-part <part-number>"
+            exit 0
+          fi
+          # Convert to integer to handle leading zeros
+          PART_TO_START_INT=$((10#$PART_TO_START))
+          PREVIOUS_PART_INT=$((PART_TO_START_INT - 1))
+
+          # Format with leading zeros for branch names
+          PART_TO_START_PADDED=$(printf "%03d" $PART_TO_START_INT)
+          PREVIOUS_PART_PADDED=$(printf "%03d" $PREVIOUS_PART_INT)
+
+          echo "part_to_start=$PART_TO_START_INT" >> $GITHUB_OUTPUT
+          echo "previous_part=$PREVIOUS_PART_INT" >> $GITHUB_OUTPUT
+          echo "part_to_start_padded=$PART_TO_START_PADDED" >> $GITHUB_OUTPUT
+          echo "previous_part_padded=$PREVIOUS_PART_PADDED" >> $GITHUB_OUTPUT
+
+      - name: Get student repo from issue
+        id: get_student_repo
+        run: |
+          # Extract student repo from issue title or body
+          # Assuming format: "student-repo: TimKingtonFC/chaltest-username"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          STUDENT_REPO=$(echo "$ISSUE_BODY" | grep -o 'student-repo: [^[:space:]]*' | cut -d' ' -f2)
+
+          if [[ -z "$STUDENT_REPO" ]]; then
+            echo "Error: Could not find student-repo in issue body"
+            echo "Issue body: $ISSUE_BODY"
+            exit 1
+          fi
+
+          echo "student_repo=$STUDENT_REPO" >> $GITHUB_OUTPUT
+
+      - name: Push solution and starter branches
+        if: steps.parse.outputs.part_to_start_padded && steps.get_student_repo.outputs.student_repo
+        run: |
+          # Clone the main repo as a bare repository
+          git clone --bare https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/TimKingtonFC/chaltest.git mirror
+          cd mirror
+
+          # Push previous part solution branch
+          git push https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.get_student_repo.outputs.student_repo }}.git part${{ steps.parse.outputs.previous_part_padded }}-solution:part${{ steps.parse.outputs.previous_part_padded }}-solution
+
+          # Push part to start starter branch
+          git push https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.get_student_repo.outputs.student_repo }}.git part${{ steps.parse.outputs.part_to_start_padded }}-starter:part${{ steps.parse.outputs.part_to_start_padded }}-starter
+
+          # Create part to start work branch from starter
+          git push https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.get_student_repo.outputs.student_repo }}.git part${{ steps.parse.outputs.part_to_start_padded }}-starter:part${{ steps.parse.outputs.part_to_start_padded }}-work
+
+          # Clean up
+          cd ..
+          rm -rf mirror
+
+      - name: Set default branch to part to start work
+        if: steps.parse.outputs.part_to_start_padded && steps.get_student_repo.outputs.student_repo
+        run: |
+          curl -X PATCH \
+            -H "Authorization: token ${{ secrets.ADMIN_GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ steps.get_student_repo.outputs.student_repo }} \
+            -d '{"default_branch": "part${{ steps.parse.outputs.part_to_start_padded }}-work"}'
+
+      - name: Comment with result
+        if: steps.get_student_repo.outputs.student_repo
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+          script: |
+            const issue_number = context.issue.number;
+            const student_repo = '${{ steps.get_student_repo.outputs.student_repo }}';
+            const part_to_start = '${{ steps.parse.outputs.part_to_start_int }}';
+            const previous_part = '${{ steps.parse.outputs.previous_part_int }}';
+
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number,
+              body: `Part ${part_to_start} delivered to ${student_repo}!\n\n- Part ${previous_part} solution has been pushed\n- Part ${part_to_start} starter code is ready\n- Default branch is now part${part_to_start}-work\n\nYou can now work on Part ${part_to_start}!`
+            });
