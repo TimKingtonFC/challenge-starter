@@ -31,7 +31,7 @@ jobs:
           echo "student_github_username=$STUDENT_GITHUB_USERNAME" >> $GITHUB_OUTPUT
           echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
 
-      - name: Create student repo from template
+      - name: Create empty student repo
         id: create_repo
         if: steps.parse.outputs.student_github_username && steps.parse.outputs.project_name
         uses: actions/github-script@v7
@@ -40,24 +40,19 @@ jobs:
           script: |
             const student = '${{ steps.parse.outputs.student_github_username }}';
             const projectName = '${{ steps.parse.outputs.project_name }}';
-            const template = process.env.GITHUB_REPOSITORY; // owner/repo (current repo)
             const repoName = `${projectName}-${student}`;
-            const [owner, templateRepo] = template.split('/');
+            const [owner, templateRepo] = process.env.GITHUB_REPOSITORY.split('/');
 
-            // Create the repo from template under our account
-            const repo = await github.rest.repos.createUsingTemplate({
-              template_owner: owner,
-              template_repo: templateRepo,
-              owner: owner, // Create under our account, not the student's
+            // Create an empty repo under our account
+            const repo = await github.rest.repos.createForAuthenticatedUser({
               name: repoName,
               private: true,
-              include_all_branches: false,
               description: `${projectName} challenge repo for ${student}`
             });
 
             // Add student as admin collaborator
             await github.rest.repos.addCollaborator({
-              owner: owner, // Our account owns the repo
+              owner: owner,
               repo: repoName,
               username: student,
               permission: 'admin'
@@ -66,6 +61,20 @@ jobs:
             core.setOutput('repo_url', repo.data.html_url);
             core.setOutput('student_repo', `${owner}/${repoName}`);
             core.setOutput('project_name', projectName);
+
+      - name: Clone main repo and push starter branch
+        if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
+        run: |
+          # Clone the main repo as a bare repository
+          git clone --bare https://x-access-token:${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/${{ steps.create_repo.outputs.project_name }}.git mirror
+          cd mirror
+
+          # Push the part001-starter branch to the student repo as part001-starter
+          git push https://x-access-token:${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.create_repo.outputs.student_repo }}.git part001-starter:part001-starter
+
+          # Clean up
+          cd ..
+          rm -rf mirror
 
       - name: Set PROJECT_NAME variable in student repo
         if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
