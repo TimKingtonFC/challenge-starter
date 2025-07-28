@@ -65,12 +65,16 @@ jobs:
       - name: Clone main repo and push starter branch
         if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
         run: |
+          # Debug: Check what we're trying to clone
+          echo "Attempting to clone: TimKingtonFC/${{ steps.create_repo.outputs.project_name }}"
+          echo "Student repo: ${{ steps.create_repo.outputs.student_repo }}"
+
           # Clone the main repo as a bare repository
-          git clone --bare https://x-access-token:${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/${{ steps.create_repo.outputs.project_name }}.git mirror
+          git clone --bare https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/TimKingtonFC/${{ steps.create_repo.outputs.project_name }}.git mirror
           cd mirror
 
           # Push the part001-starter branch to the student repo as part001-starter
-          git push https://x-access-token:${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.create_repo.outputs.student_repo }}.git part001-starter:part001-starter
+          git push https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/${{ steps.create_repo.outputs.student_repo }}.git part001-starter:part001-starter
 
           # Clean up
           cd ..
