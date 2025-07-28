@@ -11,12 +11,19 @@ jobs:
       - name: Parse command
         id: parse
         run: |
-          if [[ "${{ github.event.issue.body }}" == /create-student-repo* ]]; then
-            CMD="${{ github.event.issue.body }}"
+          # Check both title and body for the command
+          TITLE="${{ github.event.issue.title }}"
+          BODY="${{ github.event.issue.body }}"
+
+          if [[ "$TITLE" == /create-student-repo* ]]; then
+            CMD="$TITLE"
+          elif [[ "$BODY" == /create-student-repo* ]]; then
+            CMD="$BODY"
           else
-            echo "No /create-student-repo command found. Exiting."
+            echo "No /create-student-repo command found in title or body. Exiting."
             exit 0
           fi
+
           # Extract username and project name
           STUDENT_GITHUB_USERNAME=$(echo $CMD | awk '{print $2}')
           PROJECT_NAME=$(echo $CMD | awk '{print $3}')

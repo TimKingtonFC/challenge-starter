@@ -1,2 +1,3 @@
 Web page to create starter
 whitelist projects that can be cloned
+comments no matter the result
