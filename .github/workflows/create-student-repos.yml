@@ -35,6 +35,31 @@ jobs:
           echo "student_github_username=$STUDENT_GITHUB_USERNAME" >> $GITHUB_OUTPUT
           echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
 
+      - name: Find Starter Project
+        id: find_starter
+        if: steps.parse.outputs.student_github_username && steps.parse.outputs.project_name
+        run: |
+          PROJECT_NAME="${{ steps.parse.outputs.project_name }}"
+
+          STARTER_PROJECTS=("chaltest" "VM611")
+
+          PROJECT_FOUND=false
+          for projectName in "${STARTER_PROJECTS[@]}"; do
+            if [[ "$PROJECT_NAME" == "$projectName" ]]; then
+              PROJECT_FOUND=true
+              break
+            fi
+          done
+
+          if [[ "$PROJECT_FOUND" == "false" ]]; then
+            echo "❌ **Project not found!**"
+            echo ""
+            echo "The project '$PROJECT_NAME' is not in the list of starter projects."
+            exit 1
+          fi
+
+          echo "✅ Project '$PROJECT_NAME' found."
+
       - name: Create empty student repo
         id: create_repo
         if: steps.parse.outputs.student_github_username && steps.parse.outputs.project_name
@@ -129,6 +154,8 @@ jobs:
               failedStep = 'Command parsing';
             } else if ('${{ steps.create_repo.outcome }}' === 'failure') {
               failedStep = 'Repository creation';
+            } else if ('${{ steps.find_starter.outcome }}' === 'failure') {
+              failedStep = 'Find starter project';
             } else if ('${{ steps.clone_repo.outcome }}' === 'failure') {
               failedStep = 'Code delivery';
             } else if ('${{ steps.set_default.outcome }}' === 'failure') {

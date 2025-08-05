@@ -1,3 +1,2 @@
 Web page to create starter
-whitelist projects that can be cloned
-comments no matter the result
+switch to extension view takes a minute to display
