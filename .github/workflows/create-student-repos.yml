@@ -126,6 +126,34 @@ jobs:
             https://api.github.com/repos/${{ steps.create_repo.outputs.student_repo }}/actions/variables \
             -d '{"name": "PROJECT_NAME", "value": "${{ steps.create_repo.outputs.project_name }}"}'
 
+      - name: Add student to instructions repo
+        id: add_student_to_instructions
+        if: steps.create_repo.outputs.student_repo && steps.create_repo.outputs.project_name
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+          script: |
+            const student = '${{ steps.parse.outputs.student_github_username }}';
+            const projectName = '${{ steps.create_repo.outputs.project_name }}';
+            const instructionsRepoName = `${projectName}-Instructions`;
+            const [owner] = process.env.GITHUB_REPOSITORY.split('/');
+
+            try {
+              // Add student as collaborator to instructions repo with read access
+              await github.rest.repos.addCollaborator({
+                owner: owner,
+                repo: instructionsRepoName,
+                username: student,
+                permission: 'pull' // Read-only access
+              });
+
+              core.setOutput('instructions_repo_url', `https://github.com/${owner}/${instructionsRepoName}`);
+              console.log(`✅ Added ${student} to ${instructionsRepoName} with read access`);
+            } catch (error) {
+              console.warn(`⚠️ Could not add ${student} to ${instructionsRepoName}: ${error.message}`);
+              // Don't fail the workflow if instructions repo doesn't exist or other issues
+            }
+
       - name: Comment with result
         if: steps.create_repo.outputs.repo_url
         uses: actions/github-script@v7
@@ -134,10 +162,26 @@ jobs:
           script: |
             const issue_number = context.issue.number;
             const repo_url = '${{ steps.create_repo.outputs.repo_url }}';
+            const instructions_repo_url = '${{ steps.add_student_to_instructions.outputs.instructions_repo_url || '' }}';
+
+            let commentBody = `✅ **Student repository created successfully!**\n\n`;
+            commentBody += `📁 **Your challenge repository:** ${repo_url}\n`;
+
+            if (instructions_repo_url) {
+              commentBody += `📖 **Instructions repository:** ${instructions_repo_url}\n`;
+              commentBody += `\nYou have been granted read access to the instructions repository.`;
+            }
+
+                         commentBody += `\n\n🚀 **Next steps:**\n`;
+             commentBody += `1. Accept the invitations to **both** repositories\n`;
+             commentBody += `2. Clone your challenge repository\n`;
+             commentBody += `3. Open it in VS Code with the Challenge Manager extension\n`;
+             commentBody += `4. Start working on Part 1!`;
+
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number,
-              body: `Student repository created: ${repo_url}`
+              body: commentBody
             });
 
       - name: Comment on failure

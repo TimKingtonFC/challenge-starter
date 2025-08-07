@@ -1,2 +1,5 @@
+✅ When starting challenge, invite to instructions repo
+✅ Current part needs to be stored in project
+
 Web page to create starter
 switch to extension view takes a minute to display
