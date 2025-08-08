@@ -2,5 +2,6 @@
 ✅ Current part needs to be stored in project
 ✅ Only the student should be able to request a new part, and we should use the username making the issue instead of as a parameter
 
+update intro post to use issues
 Web page to create starter
 switch to extension view takes a minute to display

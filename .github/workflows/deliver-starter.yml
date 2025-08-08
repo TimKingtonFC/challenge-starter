@@ -74,6 +74,7 @@ jobs:
           STUDENT_REPO="TimKingtonFC/${PROJECT}-${USERNAME}"
           echo "student_repo=$STUDENT_REPO" >> $GITHUB_OUTPUT
           echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "project_name=$PROJECT" >> $GITHUB_OUTPUT
 
       - name: Validate user permissions
         id: validate_user
@@ -97,8 +98,11 @@ jobs:
       - name: Push solution and starter branches
         if: steps.parse.outputs.part_to_start_padded && steps.get_student_repo.outputs.student_repo && steps.validate_user.outcome == 'success'
         run: |
+          # Get the project name from the student repo parsing
+          PROJECT_NAME="${{ steps.get_student_repo.outputs.project_name }}"
+
           # Clone the main repo as a bare repository
-          git clone --bare https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/TimKingtonFC/chaltest.git mirror
+          git clone --bare https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/TimKingtonFC/${PROJECT_NAME}.git mirror
           cd mirror
 
           # Push previous part solution branch
