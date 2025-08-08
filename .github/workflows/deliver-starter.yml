@@ -59,22 +59,43 @@ jobs:
             exit 1
           fi
 
-          # Extract username and project from the command
-          USERNAME=$(echo "$CMD" | awk '{print $2}')
-          PROJECT=$(echo "$CMD" | awk '{print $3}')
-
-          if [[ -z "$USERNAME" || -z "$PROJECT" ]]; then
-            echo "Error: Could not parse username and project from command"
+          # Extract project name (username comes from issue author)
+          PROJECT=$(echo "$CMD" | awk '{print $2}')
+          if [[ -z "$PROJECT" ]]; then
+            echo "Error: Could not parse project from command"
             echo "Command: $CMD"
             exit 1
           fi
 
+          # Get username from issue author
+          USERNAME="${{ github.event.issue.user.login }}"
+
           # Construct the student repo name
           STUDENT_REPO="TimKingtonFC/${PROJECT}-${USERNAME}"
           echo "student_repo=$STUDENT_REPO" >> $GITHUB_OUTPUT
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+
+      - name: Validate user permissions
+        id: validate_user
+        if: steps.parse.outputs.part_to_start_padded && steps.get_student_repo.outputs.student_repo
+        run: |
+           # Get the username from the original issue (who started the challenge)
+           ORIGINAL_USERNAME="${{ steps.get_student_repo.outputs.username }}"
+           # Get the comment author (who is requesting the next part)
+           COMMENT_USERNAME="${{ github.event.comment.user.login }}"
+
+           if [[ "$ORIGINAL_USERNAME" != "$COMMENT_USERNAME" ]]; then
+             echo "❌ **Access Denied!**"
+             echo ""
+             echo "Only the original student (@$ORIGINAL_USERNAME) can request the next part."
+             echo "Current user: @$COMMENT_USERNAME"
+             exit 1
+           fi
+
+           echo "✅ User validation passed. @$COMMENT_USERNAME is authorized."
 
       - name: Push solution and starter branches
-        if: steps.parse.outputs.part_to_start_padded && steps.get_student_repo.outputs.student_repo
+        if: steps.parse.outputs.part_to_start_padded && steps.get_student_repo.outputs.student_repo && steps.validate_user.outcome == 'success'
         run: |
           # Clone the main repo as a bare repository
           git clone --bare https://${{ secrets.ADMIN_GITHUB_TOKEN }}@github.com/TimKingtonFC/chaltest.git mirror
@@ -111,11 +132,12 @@ jobs:
             const issue_number = context.issue.number;
             const student_repo = '${{ steps.get_student_repo.outputs.student_repo }}';
             const part_to_start = '${{ steps.parse.outputs.part_to_start }}';
+            const repo_url = `https://github.com/${student_repo}`;
 
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number,
-              body: `✅ Part ${part_to_start} delivered to ${student_repo}!`
+              body: `✅ Part ${part_to_start} delivered to ${repo_url}.`
             });
 
       - name: Comment on failure
@@ -128,10 +150,15 @@ jobs:
 
             // Determine which step failed
             let failedStep = 'Unknown step';
+            let errorMessage = 'Please check the workflow logs for details and try again.';
+
             if ('${{ steps.parse.outcome }}' === 'failure') {
               failedStep = 'Command parsing';
             } else if ('${{ steps.get_student_repo.outcome }}' === 'failure') {
               failedStep = 'Finding student repository';
+            } else if ('${{ steps.validate_user.outcome }}' === 'failure') {
+              failedStep = 'User validation';
+              errorMessage = 'Only the original student can request the next part.';
             } else if ('${{ steps.push_branches.outcome }}' === 'failure') {
               failedStep = 'Pushing branches';
             } else if ('${{ steps.set_default.outcome }}' === 'failure') {
@@ -141,5 +168,5 @@ jobs:
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number,
-              body: `❌ **Workflow failed!**\n\nFailed at: ${failedStep}\n\nPlease check the workflow logs for details and try again.`
+              body: `❌ **Workflow failed!**\n\nFailed at: ${failedStep}\n\n${errorMessage}`
             });
