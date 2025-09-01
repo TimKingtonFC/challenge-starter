@@ -12,31 +12,31 @@ jobs:
       - name: Parse command
         id: parse
         run: |
-           # Check both title and body for the command
-           TITLE="${{ github.event.issue.title }}"
-           BODY="${{ github.event.issue.body }}"
+          # Check both title and body for the command
+          TITLE="${{ github.event.issue.title }}"
+          BODY="${{ github.event.issue.body }}"
 
-           if [[ "$TITLE" == /start-challenge* ]]; then
-             CMD="$TITLE"
-           elif [[ "$BODY" == /start-challenge* ]]; then
-             CMD="$BODY"
-           else
-             echo "No /start-challenge command found in title or body. Exiting."
-             exit 0
-           fi
+          if [[ "$TITLE" == /start-challenge* ]]; then
+            CMD="$TITLE"
+          elif [[ "$BODY" == /start-challenge* ]]; then
+            CMD="$BODY"
+          else
+            echo "No /start-challenge command found in title or body. Exiting."
+            exit 0
+          fi
 
-           # Extract project name (username comes from issue author)
-           PROJECT_NAME=$(echo $CMD | awk '{print $2}')
-           if [[ -z "$PROJECT_NAME" ]]; then
-             echo "Malformed command. Usage: /start-challenge <project-name>"
-             exit 0
-           fi
+          # Extract project name (username comes from issue author)
+          PROJECT_NAME=$(echo $CMD | awk '{print $2}')
+          if [[ -z "$PROJECT_NAME" ]]; then
+            echo "Malformed command. Usage: /start-challenge <project-name>"
+            exit 0
+          fi
 
-           # Get username from issue author
-           STUDENT_GITHUB_USERNAME="${{ github.event.issue.user.login }}"
+          # Get username from issue author
+          STUDENT_GITHUB_USERNAME="${{ github.event.issue.user.login }}"
 
-           echo "student_github_username=$STUDENT_GITHUB_USERNAME" >> $GITHUB_OUTPUT
-           echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+          echo "student_github_username=$STUDENT_GITHUB_USERNAME" >> $GITHUB_OUTPUT
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
 
       - name: Find Starter Project
         id: find_starter
@@ -44,7 +44,7 @@ jobs:
         run: |
           PROJECT_NAME="${{ steps.parse.outputs.project_name }}"
 
-          STARTER_PROJECTS=("chaltest" "VM611")
+          STARTER_PROJECTS=("chaltest" "VM611" "build-a-vm")
 
           PROJECT_FOUND=false
           for projectName in "${STARTER_PROJECTS[@]}"; do
