@@ -145,7 +145,8 @@ jobs:
             const student = '${{ steps.parse.outputs.student_github_username }}';
             const projectName = '${{ steps.create_repo.outputs.project_name }}';
             const instructionsRepoName = `${projectName}-Instructions`;
-            const [owner] = process.env.GITHUB_REPOSITORY.split('/');
+            // Instructions repos live in an org: personal-account repos can't grant read-only access
+            const owner = 'FranklinComp611';
 
             try {
               // Add student as collaborator to instructions repo with read access
