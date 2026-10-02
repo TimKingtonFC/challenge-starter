@@ -75,19 +75,25 @@ jobs:
             const repoName = `${projectName}-${student}`;
             const [owner, templateRepo] = process.env.GITHUB_REPOSITORY.split('/');
 
-            // Create an empty repo under our account
-            const repo = await github.rest.repos.createForAuthenticatedUser({
-              name: repoName,
-              private: true,
-              description: `${projectName} challenge repo for ${student}`
-            });
+            // Create an empty repo under our account, reusing it if a previous run already created it
+            let repo;
+            try {
+              repo = await github.rest.repos.get({ owner, repo: repoName });
+              console.log(`Repo ${owner}/${repoName} already exists, reusing it`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              repo = await github.rest.repos.createForAuthenticatedUser({
+                name: repoName,
+                private: true,
+                description: `${projectName} challenge repo for ${student}`
+              });
+            }
 
-            // Add student as admin collaborator
+            // Add student as collaborator (repos on a personal account can't grant admin; collaborators get push access)
             await github.rest.repos.addCollaborator({
               owner: owner,
               repo: repoName,
-              username: student,
-              permission: 'admin'
+              username: student
             });
 
             core.setOutput('repo_url', repo.data.html_url);
